@@ -302,9 +302,9 @@ fn open_project_terminal(project_path: String) -> Result<(), String> {
 
 #[command]
 fn open_project_folder(project_path: String) -> Result<(), String> {
-    let p = PathBuf::from(&project_path);
     #[cfg(target_os = "windows")]
     {
+        let p = PathBuf::from(&project_path);
         let normalized = nodepilot_core::normalize_path(&p);
         std::process::Command::new("explorer")
             .arg(&normalized)
