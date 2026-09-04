@@ -41,23 +41,10 @@ C:\dev\new-angular       --> .nodepilot.local = 22.18.0
 
 ---
 
-## 📊 Objective Comparison
-
-| Feature | NodePilot | nvm / nvm-windows | fnm | Volta |
-| :--- | :--- | :--- | :--- | :--- |
-| **Philosophy** | Project-first execution | Global / Shell switching | Fast shell switching | Tool pinning |
-| **Simultaneous Terminals** | ✅ Native per-process routing | ❌ Global switch alters state | ⚠️ Requires shell hooks per shell | ✅ Shim-based |
-| **Desktop GUI** | ✅ Full Tauri 2 Dashboard | ❌ CLI only | ❌ CLI only | ❌ CLI only |
-| **Automated Project Discovery** | ✅ Recursive workspace scanner | ❌ None | ❌ None | ❌ None |
-| **Framework Compatibility Engine**| ✅ Built-in matrix (Angular, Next, etc.) | ❌ None | ❌ None | ❌ None |
-| **Coexistence Mode** | ✅ Safe read-only detection | ❌ Takes over PATH | ❌ Takes over PATH | ❌ Takes over PATH |
-| **Parent Directory Inheritance** | ✅ Monorepo & folder tree | ⚠️ Partial | ⚠️ Partial | ⚠️ Partial |
-
----
-
 ## 🚀 Key Features
 
-* **Desktop Application**: Modern, high-performance interface built with **Tauri 2**, **React**, and **TypeScript**.
+* **Terminal-First Architecture**: Lightweight, sub-millisecond process routing with zero background daemon overhead.
+* **Optional Companion GUI**: Visual dashboard available on demand via `nodepilot gui install`, completely removable with `nodepilot gui remove`.
 * **Unified Core in Rust**: Fast, passive project scanning, SHA-256 verified runtime downloads, and sub-millisecond process routing.
 * **Smart Configuration Hierarchy**:
   1. `.nodepilot.local` (Local developer override)
