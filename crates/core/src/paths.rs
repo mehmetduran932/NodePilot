@@ -1,7 +1,9 @@
 use std::path::{Path, PathBuf};
 #[cfg(not(target_os = "windows"))]
 use directories::UserDirs;
+#[cfg(target_os = "windows")]
 use directories::BaseDirs;
+#[cfg(target_os = "windows")]
 use crate::constants::APP_NAME;
 
 /// Normalizes a path, stripping Windows UNC verbatim `\\?\` prefixes that cause issues with cmd/explorer.
@@ -10,10 +12,10 @@ pub fn normalize_path(path: &Path) -> PathBuf {
         #[cfg(target_os = "windows")]
         {
             let s = c.to_string_lossy();
-            if s.starts_with(r"\\?\UNC\") {
-                PathBuf::from(format!(r"\\{}", &s[8..]))
-            } else if s.starts_with(r"\\?\") {
-                PathBuf::from(&s[4..])
+            if let Some(stripped) = s.strip_prefix(r"\\?\UNC\") {
+                PathBuf::from(format!(r"\\{}", stripped))
+            } else if let Some(stripped) = s.strip_prefix(r"\\?\") {
+                PathBuf::from(stripped)
             } else {
                 c
             }
@@ -43,6 +45,7 @@ impl NodePilotPaths {
     ///
     /// On Windows: `%LOCALAPPDATA%\NodePilot`
     /// On macOS/Linux: `~/.nodepilot`
+    #[allow(clippy::should_implement_trait)]
     pub fn default() -> Result<Self, crate::error::NodePilotError> {
         let root = Self::resolve_root_dir()?;
         let paths = Self {

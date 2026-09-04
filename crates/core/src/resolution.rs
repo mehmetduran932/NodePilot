@@ -8,6 +8,7 @@
 //! 5. package.json engines.node
 //! 6. .tool-versions
 //! 7. mise.toml
+//!
 //! Recursively walks parent directories up to root before falling back to global default.
 
 use std::path::{Path, PathBuf};

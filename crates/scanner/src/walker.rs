@@ -50,7 +50,7 @@ pub fn scan_workspace(
         .follow_links(false)
         .into_iter();
 
-    for entry in walker.filter_entry(|e| should_traverse(e)) {
+    for entry in walker.filter_entry(should_traverse) {
         let entry = match entry {
             Ok(e) => e,
             Err(_) => continue,

@@ -107,6 +107,7 @@ pub fn enable_integration(paths: &NodePilotPaths) -> Result<(), NodePilotError> 
 
 /// Disables NodePilot shell integration and cleanly removes bin_dir from user PATH.
 pub fn disable_integration(paths: &NodePilotPaths) -> Result<(), NodePilotError> {
+    #[cfg(target_os = "windows")]
     let bin_str = paths.bin_dir.to_string_lossy().to_string();
 
     #[cfg(target_os = "windows")]

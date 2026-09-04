@@ -176,7 +176,7 @@ fn get_all_dependencies(pkg: &Value) -> std::collections::HashMap<String, String
 }
 
 fn clean_semver(raw: &str) -> String {
-    raw.trim_start_matches(|c: char| c == '^' || c == '~' || c == '>' || c == '=' || c == 'v' || c == '<')
+    raw.trim_start_matches(['^', '~', '>', '=', 'v', '<'])
         .trim()
         .to_string()
 }

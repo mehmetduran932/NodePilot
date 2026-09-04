@@ -843,13 +843,7 @@ fn find_gui_binary(paths: &NodePilotPaths) -> Option<PathBuf> {
         exe_dir.join("../target/debug").join(desktop_bin_name),
     ];
 
-    for candidate in alt_candidates {
-        if candidate.is_file() {
-            return Some(candidate);
-        }
-    }
-
-    None
+    alt_candidates.into_iter().find(|candidate| candidate.is_file())
 }
 
 fn launch_gui(paths: &NodePilotPaths) -> anyhow::Result<()> {
