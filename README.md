@@ -13,6 +13,27 @@ Instead of switching global Node environments via `nvm use` or global symlinks, 
 
 ---
 
+## ⚡ Quick Install
+
+### Windows (PowerShell)
+Run in PowerShell:
+```powershell
+irm https://raw.githubusercontent.com/mehmetduran932/NodePilot/master/scripts/install.ps1 | iex
+```
+
+### macOS (Terminal)
+Run in Bash / Zsh:
+```bash
+curl -fsSL https://raw.githubusercontent.com/mehmetduran932/NodePilot/master/scripts/install.sh | bash
+```
+
+### Rust / Cargo
+```bash
+cargo install nodepilot --git https://github.com/mehmetduran932/NodePilot.git
+```
+
+---
+
 ## 🌟 Why NodePilot?
 
 Traditional Node version managers require you to switch global state or remember shell hooks:
