@@ -1,0 +1,53 @@
+[workspace]
+members = [
+    "crates/core",
+    "crates/scanner",
+    "crates/node-runtime",
+    "crates/compatibility",
+    "crates/shim",
+    "crates/updater",
+    "crates/cli",
+    "apps/desktop/src-tauri",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["NodePilot Contributors"]
+license = "MIT"
+repository = "https://github.com/nodepilot/nodepilot"
+keywords = ["node", "version-manager", "developer-tools", "runtime"]
+
+[workspace.dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+anyhow = "1.0"
+tokio = { version = "1.38", features = ["full"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
+sha2 = "0.10"
+hex = "0.4"
+zip = { version = "2.1", default-features = false, features = ["deflate"] }
+flate2 = "1.0"
+tar = "0.4"
+semver = "1.0"
+walkdir = "2.5"
+ignore = "0.4"
+directories = "5.0"
+chrono = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+clap = { version = "4.5", features = ["derive", "env", "cargo"] }
+dialoguer = "0.11"
+console = "0.15"
+indicatif = "0.17"
+tempfile = "3.10"
+
+# Local crates
+nodepilot-core = { path = "crates/core" }
+nodepilot-scanner = { path = "crates/scanner" }
+nodepilot-node-runtime = { path = "crates/node-runtime" }
+nodepilot-compatibility = { path = "crates/compatibility" }
+nodepilot-shim = { path = "crates/shim" }
+nodepilot-updater = { path = "crates/updater" }

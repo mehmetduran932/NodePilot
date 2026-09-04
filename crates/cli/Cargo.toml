@@ -1,0 +1,27 @@
+[package]
+name = "nodepilot"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "nodepilot"
+path = "src/main.rs"
+
+[dependencies]
+nodepilot-core = { workspace = true }
+nodepilot-node-runtime = { workspace = true }
+nodepilot-scanner = { workspace = true }
+nodepilot-compatibility = { workspace = true }
+nodepilot-shim = { workspace = true }
+nodepilot-updater = { workspace = true }
+clap = { workspace = true }
+dialoguer = { workspace = true }
+console = { workspace = true }
+indicatif = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+chrono = { workspace = true }

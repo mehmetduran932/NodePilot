@@ -1,0 +1,16 @@
+[package]
+name = "nodepilot-shim"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "nodepilot-shim"
+path = "src/main.rs"
+
+[dependencies]
+nodepilot-core = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

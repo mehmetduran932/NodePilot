@@ -1,0 +1,28 @@
+[package]
+name = "nodepilot-desktop"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[lib]
+name = "nodepilot_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.0", features = [] }
+
+[dependencies]
+tauri = { version = "2.0", features = [] }
+tauri-plugin-shell = "2.0"
+tauri-plugin-dialog = "2.0"
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+nodepilot-core = { workspace = true }
+nodepilot-node-runtime = { workspace = true }
+nodepilot-scanner = { workspace = true }
+nodepilot-compatibility = { workspace = true }
+nodepilot-updater = { workspace = true }
+chrono = { workspace = true }
