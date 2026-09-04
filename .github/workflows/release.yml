@@ -1,4 +1,4 @@
-﻿name: Release
+name: Release
 
 on:
   push:
@@ -48,7 +48,9 @@ jobs:
       - name: Package Unix Artifacts
         if: runner.os != 'Windows'
         run: |
-          tar -czvf "${{ matrix.archive_name }}" -C "target/${{ matrix.target }}/release" nodepilot nodepilot-shim -C ../../../ README.md LICENSE SECURITY.md
+          cp target/${{ matrix.target }}/release/nodepilot .
+          cp target/${{ matrix.target }}/release/nodepilot-shim .
+          tar -czvf "${{ matrix.archive_name }}" nodepilot nodepilot-shim README.md LICENSE SECURITY.md
 
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
