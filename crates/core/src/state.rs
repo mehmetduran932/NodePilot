@@ -99,9 +99,9 @@ impl AppState {
 
     /// Add a workspace path if not already present.
     pub fn add_workspace(&mut self, path: PathBuf) -> bool {
-        let canonical = path.canonicalize().unwrap_or(path);
-        if !self.workspaces.iter().any(|w| w == &canonical) {
-            self.workspaces.push(canonical);
+        let normalized = crate::paths::normalize_path(&path);
+        if !self.workspaces.iter().any(|w| w == &normalized) {
+            self.workspaces.push(normalized);
             true
         } else {
             false
@@ -110,11 +110,11 @@ impl AppState {
 
     /// Remove a workspace path.
     pub fn remove_workspace(&mut self, path: &Path) -> bool {
-        let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+        let normalized = crate::paths::normalize_path(path);
         let before_len = self.workspaces.len();
-        self.workspaces.retain(|w| w != &canonical && w != path);
+        self.workspaces.retain(|w| w != &normalized && w != path);
         // Also remove projects belonging to this workspace
-        self.projects.retain(|p| p.workspace_root != canonical && p.workspace_root != path);
+        self.projects.retain(|p| p.workspace_root != normalized && p.workspace_root != path);
         self.workspaces.len() < before_len
     }
 }

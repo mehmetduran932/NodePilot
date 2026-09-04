@@ -1,10 +1,31 @@
-//! NodePilot paths management for Windows and macOS.
-
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 #[cfg(not(target_os = "windows"))]
 use directories::UserDirs;
 use directories::BaseDirs;
 use crate::constants::APP_NAME;
+
+/// Normalizes a path, stripping Windows UNC verbatim `\\?\` prefixes that cause issues with cmd/explorer.
+pub fn normalize_path(path: &Path) -> PathBuf {
+    if let Ok(c) = path.canonicalize() {
+        #[cfg(target_os = "windows")]
+        {
+            let s = c.to_string_lossy();
+            if s.starts_with(r"\\?\UNC\") {
+                PathBuf::from(format!(r"\\{}", &s[8..]))
+            } else if s.starts_with(r"\\?\") {
+                PathBuf::from(&s[4..])
+            } else {
+                c
+            }
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            c
+        }
+    } else {
+        path.to_path_buf()
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct NodePilotPaths {

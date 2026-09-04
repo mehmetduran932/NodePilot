@@ -40,13 +40,33 @@ pub fn install_node_archive(
     // Find that directory and move its contents, or rename it
     let extracted_root = find_extracted_root(&temp_staging_dir)?;
 
-    // Atomic move to final target directory
-    if let Err(e) = std::fs::rename(&extracted_root, &target_version_dir) {
+    // Ensure any stale target directory is safely removed first
+    if target_version_dir.exists() {
+        let _ = std::fs::remove_dir_all(&target_version_dir);
+    }
+
+    // Atomic move to final target directory with Windows lock retry backoff
+    let mut moved = false;
+    let mut last_err = None;
+    for attempt in 0..5 {
+        match std::fs::rename(&extracted_root, &target_version_dir) {
+            Ok(_) => {
+                moved = true;
+                break;
+            }
+            Err(e) => {
+                last_err = Some(e);
+                std::thread::sleep(std::time::Duration::from_millis(50 * (attempt + 1)));
+            }
+        }
+    }
+
+    if !moved {
         let _ = std::fs::remove_dir_all(&temp_staging_dir);
         return Err(NodePilotError::Extraction(format!(
             "Failed to move installed runtime to {}: {}",
             target_version_dir.display(),
-            e
+            last_err.map(|e| e.to_string()).unwrap_or_default()
         )));
     }
 
@@ -67,10 +87,28 @@ pub fn install_node_archive(
 }
 
 /// Uninstalls an installed Node.js version.
+/// Guarantees that only valid, safe version subdirectories inside `paths.versions_dir` can ever be deleted.
 pub fn uninstall_node_version(paths: &NodePilotPaths, version: &str) -> Result<(), NodePilotError> {
-    let clean = version.trim_start_matches('v');
+    let clean = version.trim_start_matches('v').trim();
+    if clean.is_empty() {
+        return Err(NodePilotError::InvalidOperation("Cannot uninstall with empty version".into()));
+    }
+
+    // Validation: only allow valid version characters (digits, dots, hyphens, alphanumeric)
+    if !clean.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-') {
+        return Err(NodePilotError::SecurityTraversal(format!("Invalid version identifier: {}", clean)));
+    }
+
+    // Defense-in-depth: verify path is strictly a child of versions_dir
     let target = paths.version_dir(clean);
-    if target.exists() {
+    if target.parent() != Some(&paths.versions_dir) {
+        return Err(NodePilotError::SecurityTraversal(format!(
+            "Target path escapes versions directory: {}",
+            target.display()
+        )));
+    }
+
+    if target.is_dir() {
         std::fs::remove_dir_all(&target)?;
     }
     Ok(())

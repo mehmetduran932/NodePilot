@@ -114,7 +114,7 @@ fn match_rules(
                 CompatibilityReport {
                     status: CompatibilityStatus::Compatible,
                     message: format!("Node {} is compatible with {} {}", node_ver, framework_display, fw_major),
-                    recommended_node: recommended,
+                    recommended_node: None, // Already compatible, no change needed!
                 }
             } else {
                 CompatibilityReport {

@@ -1,5 +1,10 @@
 # NodePilot 🧭
 
+[![Build and Test](https://github.com/mehmetduran932/NodePilot/actions/workflows/build.yml/badge.svg)](https://github.com/mehmetduran932/NodePilot/actions/workflows/build.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS-informational.svg)]()
+[![Security Policy](https://img.shields.io/badge/Security-Policy-brightgreen.svg)](SECURITY.md)
+
 > **Stop managing Node versions globally. Let each project define its own Node environment.**
 
 NodePilot is a cross-platform (Windows 10/11, macOS Apple Silicon & Intel), project-aware Node.js runtime manager and desktop developer dashboard.
@@ -76,6 +81,9 @@ C:\dev\new-angular       --> .nodepilot.local = 22.18.0
 The `nodepilot` CLI provides intuitive, human-readable commands:
 
 ```bash
+# Interactive setup wizard (Asks about shell integration, workspaces & optional GUI)
+nodepilot setup
+
 # Display version and philosophy
 nodepilot version
 
@@ -103,6 +111,9 @@ nodepilot unassign
 # Scan directory for Node.js projects passively
 nodepilot scan C:\dev
 
+# List all discovered projects
+nodepilot projects
+
 # Run environment health check and coexistence diagnostics
 nodepilot doctor
 
@@ -110,6 +121,12 @@ nodepilot doctor
 nodepilot integration status
 nodepilot integration enable
 nodepilot integration disable
+
+# Visual GUI Lifecycle Management (Optional, can be added or removed anytime without re-installing)
+nodepilot gui status     # Check if visual interface is enabled
+nodepilot gui install    # Enable and configure visual desktop/browser interface
+nodepilot gui open       # Launch visual GUI dashboard
+nodepilot gui remove     # Disable GUI component and return to pure terminal mode
 
 # Check for application updates
 nodepilot update
@@ -154,8 +171,8 @@ Prerequisites:
 
 ```bash
 # Clone the repository
-git clone https://github.com/nodepilot/nodepilot.git
-cd nodepilot
+git clone https://github.com/mehmetduran932/NodePilot.git
+cd NodePilot
 
 # Run unit and integration tests
 cargo test --workspace --exclude nodepilot-desktop

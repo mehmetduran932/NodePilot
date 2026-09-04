@@ -14,6 +14,34 @@ pub struct FrameworkRule {
 pub fn get_angular_rules() -> Vec<FrameworkRule> {
     vec![
         FrameworkRule {
+            min_framework_major: 2,
+            max_framework_major: Some(7),
+            supported_node_majors: vec![8, 10],
+            recommended_node: "10.24.1",
+            notes: "Angular 2-7 requires Node 8.x or 10.x",
+        },
+        FrameworkRule {
+            min_framework_major: 8,
+            max_framework_major: Some(8),
+            supported_node_majors: vec![10, 12],
+            recommended_node: "12.22.12",
+            notes: "Angular 8 requires Node 10.9+ or 12.x",
+        },
+        FrameworkRule {
+            min_framework_major: 9,
+            max_framework_major: Some(9),
+            supported_node_majors: vec![10, 12],
+            recommended_node: "12.22.12",
+            notes: "Angular 9 requires Node 10.13+ or 12.x",
+        },
+        FrameworkRule {
+            min_framework_major: 10,
+            max_framework_major: Some(10),
+            supported_node_majors: vec![12, 14],
+            recommended_node: "14.21.3",
+            notes: "Angular 10 requires Node 12.0+ or 14.x",
+        },
+        FrameworkRule {
             min_framework_major: 11,
             max_framework_major: Some(11),
             supported_node_majors: vec![10, 12, 14],

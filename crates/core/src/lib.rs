@@ -11,7 +11,7 @@ pub mod managers;
 pub mod integration;
 
 pub use constants::*;
-pub use paths::NodePilotPaths;
+pub use paths::{NodePilotPaths, normalize_path};
 pub use error::NodePilotError;
 pub use config::Settings;
 pub use state::{AppState, ProjectRecord, PackageManager, CompatibilityStatus, ConfigSourceType};

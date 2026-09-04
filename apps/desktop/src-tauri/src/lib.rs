@@ -266,19 +266,19 @@ fn open_project_terminal(project_path: String) -> Result<(), String> {
 
     #[cfg(target_os = "windows")]
     {
+        let normalized = nodepilot_core::normalize_path(&p);
         // Try Windows Terminal first (wt -d <path>), then powershell
         let wt_status = std::process::Command::new("wt")
             .arg("-d")
-            .arg(&project_path)
+            .arg(&normalized)
             .env("PATH", &env_path)
             .spawn();
 
         if wt_status.is_err() {
-            // Fallback to powershell with working dir
+            // Fallback to powershell launched directly in the project directory
             std::process::Command::new("powershell")
                 .arg("-NoExit")
-                .arg("-Command")
-                .arg(format!("Set-Location -LiteralPath '{}'", project_path))
+                .current_dir(&normalized)
                 .env("PATH", &env_path)
                 .spawn()
                 .map_err(|e| e.to_string())?;
@@ -302,10 +302,12 @@ fn open_project_terminal(project_path: String) -> Result<(), String> {
 
 #[command]
 fn open_project_folder(project_path: String) -> Result<(), String> {
+    let p = PathBuf::from(&project_path);
     #[cfg(target_os = "windows")]
     {
+        let normalized = nodepilot_core::normalize_path(&p);
         std::process::Command::new("explorer")
-            .arg(&project_path)
+            .arg(&normalized)
             .spawn()
             .map_err(|e| e.to_string())?;
     }

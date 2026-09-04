@@ -1,13 +1,17 @@
-name: Release Builds
+﻿name: Release
 
 on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
-  build-desktop:
-    name: Build Desktop on ${{ matrix.platform }}
+  release-cli:
+    name: Build & Package on ${{ matrix.platform }}
     runs-on: ${{ matrix.platform }}
     strategy:
       fail-fast: false
@@ -15,46 +19,40 @@ jobs:
         include:
           - platform: 'windows-latest'
             target: 'x86_64-pc-windows-msvc'
-            name: 'windows-x64'
+            archive_name: 'nodepilot-windows-x64.zip'
           - platform: 'macos-latest'
             target: 'aarch64-apple-darwin'
-            name: 'macos-arm64'
+            archive_name: 'nodepilot-macos-arm64.tar.gz'
           - platform: 'macos-13'
             target: 'x86_64-apple-darwin'
-            name: 'macos-x64'
+            archive_name: 'nodepilot-macos-x64.tar.gz'
 
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Install Rust Stable
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
 
-      - name: Install Frontend Dependencies
-        working-directory: apps/desktop
-        run: npm ci
-
-      - name: Build Frontend
-        working-directory: apps/desktop
-        run: npm run build
-
-      - name: Build CLI & Shim
+      - name: Build CLI & Shim Binaries
         run: cargo build --release --target ${{ matrix.target }} -p nodepilot -p nodepilot-shim
 
-      - name: Build Tauri Desktop Bundle
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Package Windows Artifacts
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "target/${{ matrix.target }}/release/nodepilot.exe", "target/${{ matrix.target }}/release/nodepilot-shim.exe", "README.md", "LICENSE", "SECURITY.md" -DestinationPath "${{ matrix.archive_name }}"
+
+      - name: Package Unix Artifacts
+        if: runner.os != 'Windows'
+        run: |
+          tar -czvf "${{ matrix.archive_name }}" -C "target/${{ matrix.target }}/release" nodepilot nodepilot-shim -C ../../../ README.md LICENSE SECURITY.md
+
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'NodePilot ${{ github.ref_name }}'
-          releaseBody: 'See CHANGELOG.md for release details.'
-          releaseDraft: false
-          prerelease: false
-          args: --target ${{ matrix.target }}
+          files: ${{ matrix.archive_name }}
+          generate_release_notes: true

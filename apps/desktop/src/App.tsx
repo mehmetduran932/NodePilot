@@ -20,7 +20,7 @@ import {
   UpdateCheckResult 
 } from './types';
 
-// Safely invoke Tauri commands with graceful fallback for web preview
+// Safely invoke Tauri commands or HTTP API when running in browser mode
 async function tauriInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
   if (isTauri) {
@@ -32,6 +32,21 @@ async function tauriInvoke<T>(cmd: string, args?: Record<string, unknown>): Prom
       throw err;
     }
   }
+
+  // Real HTTP API server in browser mode
+  try {
+    const res = await fetch('/api/invoke', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cmd, args: args || {} }),
+    });
+    if (res.ok) {
+      return await res.json() as T;
+    }
+  } catch (err) {
+    // API server not responding, fallback to mock
+  }
+
   // Browser preview fallback mock
   return mockTauriCall<T>(cmd, args);
 }

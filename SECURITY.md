@@ -1,4 +1,4 @@
-# Security Policy
+﻿# Security Policy
 
 ## Supported Versions
 
@@ -8,20 +8,19 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in NodePilot, please do **NOT** open a public GitHub issue.
+Security and privacy are foundational principles for **NodePilot**.
 
-Please report the vulnerability by emailing the security team or opening a confidential security advisory on GitHub:
+If you discover a security vulnerability:
+1. **Do not** open a public GitHub issue.
+2. Please report the vulnerability privately via **[GitHub Private Security Advisory](https://github.com/mehmetduran932/NodePilot/security/advisories/new)** or by reaching out directly to the repository maintainer.
+3. Include details of the vulnerability, affected components (e.g. shim router, runtime installer, config parser, or desktop GUI), and minimal reproduction steps.
 
-* Email: `security@nodepilot.dev`
+We appreciate responsible disclosure and will respond promptly to verify, assess, and release patched versions.
 
-Please include:
-* Description of the vulnerability
-* Steps to reproduce or proof-of-concept
-* Potential impact and affected operating systems
+## Security Architecture & Boundaries
 
-## Security Commitments
-
-* **Cryptographic Verification**: NodePilot validates the official SHA-256 checksum of every downloaded Node.js distribution before extraction.
-* **Extraction Path Traversal Defense**: All archive extraction routines validate paths to prevent directory traversal (`ZipSlip`).
-* **Passive Execution**: NodePilot never executes `postinstall`, `npm install`, or untrusted project scripts during project discovery.
-* **Telemetry**: NodePilot does not collect or transmit user environment secrets or source code.
+NodePilot is designed with defensive security controls:
+- **Cryptographic Verification**: All downloaded Node.js runtime packages are verified against official SHA-256 checksums from `nodejs.org` before extraction.
+- **Passive Project Scanning**: Project inspection parses structured files (`package.json`, `.nvmrc`, etc.) purely as static data. NodePilot never invokes package managers, executes project scripts, or runs untrusted local dependencies during scans.
+- **Path Traversal Protection**: Archive extractions rigorously validate all member paths to prevent directory traversal (`ZipSlip`) attacks.
+- **Least Privilege Principle**: NodePilot operates entirely in user space (`%LOCALAPPDATA%` on Windows, `~/.local/share` on macOS/Linux) and does not require administrative / root privileges for runtime management or execution.

@@ -18,6 +18,9 @@ pub struct Settings {
     pub telemetry: bool,
     pub theme: String,
     pub global_default_version: Option<String>,
+    pub gui_installed: bool,
+    pub ask_gui_launch: bool,
+    pub auto_install_missing_node: bool,
 }
 
 impl Default for Settings {
@@ -34,6 +37,9 @@ impl Default for Settings {
             telemetry: false, // Strict privacy default
             theme: "system".into(),
             global_default_version: None,
+            gui_installed: false,
+            ask_gui_launch: true,
+            auto_install_missing_node: true,
         }
     }
 }

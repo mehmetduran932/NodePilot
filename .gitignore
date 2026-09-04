@@ -1,26 +1,34 @@
-# Rust
-/target
+﻿## Rust & Cargo
+/target/
 **/*.rs.bk
-Cargo.lock
+*.pdb
 
-# Node.js
+## Node.js & Web
 node_modules/
 dist/
 dist-ssr/
 *.local
 
-# Tauri
-/apps/desktop/src-tauri/target
+## Tauri Desktop
+/apps/desktop/src-tauri/target/
 
-# OS files
-.DS_Store
-Thumbs.db
+## Build Results & Binaries
+publish/
+*.exe
+*.dll
 
-# IDEs
+## IDEs & Editors
 .idea/
 .vscode/
 *.swp
 *.swo
 
-# NodePilot local metadata
+## OS Generated
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+## NodePilot Local Workspace Overrides
 .nodepilot.local

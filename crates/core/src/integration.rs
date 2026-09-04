@@ -48,8 +48,8 @@ pub fn enable_integration(paths: &NodePilotPaths) -> Result<(), NodePilotError> 
 
     #[cfg(target_os = "windows")]
     {
-        use winreg::enums::{HKEY_CURRENT_USER, KEY_READ, KEY_WRITE};
-        use winreg::RegKey;
+        use winreg::enums::{HKEY_CURRENT_USER, KEY_READ, KEY_WRITE, REG_EXPAND_SZ};
+        use winreg::{RegKey, RegValue};
 
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         let env = hkcu.open_subkey_with_flags("Environment", KEY_READ | KEY_WRITE)
@@ -81,7 +81,13 @@ pub fn enable_integration(paths: &NodePilotPaths) -> Result<(), NodePilotError> 
             format!("{};{}", bin_str, current_user_path)
         };
 
-        env.set_value("Path", &new_path)
+        // Preserve REG_EXPAND_SZ so %USERPROFILE% and other variables expand properly
+        let reg_val = RegValue {
+            vtype: REG_EXPAND_SZ,
+            bytes: new_path.encode_utf16().chain(std::iter::once(0)).flat_map(|u| u.to_le_bytes()).collect(),
+        };
+
+        env.set_raw_value("Path", &reg_val)
             .map_err(|e| NodePilotError::Integration(format!("Failed to write user PATH registry: {}", e)))?;
 
         // Broadcast WM_SETTINGCHANGE so new shells pick it up
@@ -105,8 +111,8 @@ pub fn disable_integration(paths: &NodePilotPaths) -> Result<(), NodePilotError>
 
     #[cfg(target_os = "windows")]
     {
-        use winreg::enums::{HKEY_CURRENT_USER, KEY_READ, KEY_WRITE};
-        use winreg::RegKey;
+        use winreg::enums::{HKEY_CURRENT_USER, KEY_READ, KEY_WRITE, REG_EXPAND_SZ};
+        use winreg::{RegKey, RegValue};
 
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         let env = hkcu.open_subkey_with_flags("Environment", KEY_READ | KEY_WRITE)
@@ -119,7 +125,12 @@ pub fn disable_integration(paths: &NodePilotPaths) -> Result<(), NodePilotError>
             .collect();
 
         let new_path = entries.join(";");
-        env.set_value("Path", &new_path)
+        let reg_val = RegValue {
+            vtype: REG_EXPAND_SZ,
+            bytes: new_path.encode_utf16().chain(std::iter::once(0)).flat_map(|u| u.to_le_bytes()).collect(),
+        };
+
+        env.set_raw_value("Path", &reg_val)
             .map_err(|e| NodePilotError::Integration(format!("Failed to update user PATH registry: {}", e)))?;
 
         broadcast_env_change();
@@ -188,7 +199,7 @@ fn broadcast_env_change() {
             0,
             env_str.as_ptr(),
             SMTO_ABORTIFHUNG,
-            5000,
+            1000,
             &mut result,
         );
     }
