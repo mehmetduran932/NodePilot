@@ -60,6 +60,7 @@ pub fn enable_integration(paths: &NodePilotPaths) -> Result<(), NodePilotError> 
         // Check if already in PATH
         let entries: Vec<&str> = current_user_path.split(';').map(|s| s.trim()).collect();
         if entries.iter().any(|&e| e.eq_ignore_ascii_case(&bin_str)) {
+            configure_powershell_profiles(&paths.bin_dir, true);
             return Ok(()); // Already present
         }
 
@@ -92,6 +93,9 @@ pub fn enable_integration(paths: &NodePilotPaths) -> Result<(), NodePilotError> 
 
         // Broadcast WM_SETTINGCHANGE so new shells pick it up
         broadcast_env_change();
+
+        // Ensure PowerShell sessions prioritize NodePilot ahead of System PATH
+        configure_powershell_profiles(&paths.bin_dir, true);
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -135,6 +139,9 @@ pub fn disable_integration(paths: &NodePilotPaths) -> Result<(), NodePilotError>
             .map_err(|e| NodePilotError::Integration(format!("Failed to update user PATH registry: {}", e)))?;
 
         broadcast_env_change();
+
+        // Cleanly remove from PowerShell profiles
+        configure_powershell_profiles(&paths.bin_dir, false);
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -203,5 +210,62 @@ fn broadcast_env_change() {
             1000,
             &mut result,
         );
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn configure_powershell_profiles(bin_dir: &Path, enable: bool) {
+    let mut doc_dirs = Vec::new();
+    if let Some(user_dirs) = directories::UserDirs::new() {
+        if let Some(doc) = user_dirs.document_dir() {
+            doc_dirs.push(doc.to_path_buf());
+        }
+    }
+    if let Ok(userprofile) = std::env::var("USERPROFILE") {
+        let p = PathBuf::from(&userprofile);
+        doc_dirs.push(p.join("Documents"));
+        doc_dirs.push(p.join("OneDrive").join("Documents"));
+    }
+
+    let bin_str = bin_dir.to_string_lossy();
+    let marker_start = "# >>> NodePilot initialization >>>";
+    let marker_end = "# <<< NodePilot initialization <<<";
+    let block = format!(
+        "{}\r\nif (Test-Path \"{}\") {{\r\n    $env:PATH = \"{};$env:PATH\"\r\n}}\r\n{}\r\n",
+        marker_start, bin_str, bin_str, marker_end
+    );
+
+    for doc_dir in doc_dirs {
+        let targets = [
+            doc_dir.join("WindowsPowerShell").join("Microsoft.PowerShell_profile.ps1"),
+            doc_dir.join("PowerShell").join("Microsoft.PowerShell_profile.ps1"),
+        ];
+
+        for target in targets {
+            if enable {
+                if let Some(parent) = target.parent() {
+                    let _ = std::fs::create_dir_all(parent);
+                }
+                let existing = std::fs::read_to_string(&target).unwrap_or_default();
+                if !existing.contains(marker_start) {
+                    let new_content = if existing.is_empty() {
+                        block.clone()
+                    } else {
+                        format!("{}\r\n{}", existing.trim_end(), block)
+                    };
+                    let _ = std::fs::write(&target, new_content);
+                }
+            } else if target.is_file() {
+                let existing = std::fs::read_to_string(&target).unwrap_or_default();
+                if existing.contains(marker_start) {
+                    if let (Some(start_idx), Some(end_idx)) = (existing.find(marker_start), existing.find(marker_end)) {
+                        let before = &existing[..start_idx];
+                        let after = &existing[end_idx + marker_end.len()..];
+                        let cleaned = format!("{}{}", before.trim_end(), after).trim().to_string();
+                        let _ = std::fs::write(&target, cleaned);
+                    }
+                }
+            }
+        }
     }
 }

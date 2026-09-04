@@ -418,6 +418,7 @@ fn try_import_tool_from_nvm_or_versions(
 }
 
 /// Helper to copy tool-specific packages from one node_modules directory to another
+#[cfg(target_os = "windows")]
 fn copy_matching_tool_node_modules(src_nm: &Path, dest_nm: &Path, tool: &str) {
     if !src_nm.is_dir() {
         return;
@@ -444,6 +445,7 @@ fn copy_matching_tool_node_modules(src_nm: &Path, dest_nm: &Path, tool: &str) {
     }
 }
 
+#[cfg(target_os = "windows")]
 fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
     std::fs::create_dir_all(dst)?;
     for entry in std::fs::read_dir(src)? {
