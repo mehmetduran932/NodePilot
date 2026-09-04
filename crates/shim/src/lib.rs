@@ -26,7 +26,7 @@ pub fn install_shims(paths: &NodePilotPaths, shim_binary_path: &Path) -> Result<
         for tool in DEFAULT_SHIMMED_TOOLS {
             let dest = paths.bin_dir.join(tool);
             let _ = std::fs::remove_file(&dest);
-            if let Err(_) = symlink(shim_binary_path, &dest) {
+            if symlink(shim_binary_path, &dest).is_err() {
                 let _ = std::fs::copy(shim_binary_path, &dest);
             }
         }
