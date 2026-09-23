@@ -104,6 +104,7 @@ pub fn enable_integration(paths: &NodePilotPaths) -> Result<(), NodePilotError> 
         let env_file = paths.root.join("nodepilot.env");
         let content = format!("export PATH=\"{}:$PATH\"\n", bin_str);
         std::fs::write(&env_file, content)?;
+        configure_unix_shell_profiles(&env_file, true);
     }
 
     Ok(())
@@ -147,6 +148,7 @@ pub fn disable_integration(paths: &NodePilotPaths) -> Result<(), NodePilotError>
     #[cfg(not(target_os = "windows"))]
     {
         let env_file = paths.root.join("nodepilot.env");
+        configure_unix_shell_profiles(&env_file, false);
         if env_file.exists() {
             let _ = std::fs::remove_file(env_file);
         }
@@ -173,7 +175,72 @@ fn check_persisted_path(bin_dir: &Path) -> bool {
     #[cfg(not(target_os = "windows"))]
     {
         let env_file = bin_dir.parent().map(|p| p.join("nodepilot.env"));
-        env_file.map(|f| f.exists()).unwrap_or(false)
+        let env_exists = env_file.map(|f| f.exists()).unwrap_or(false);
+        env_exists
+            && unix_shell_profiles().iter().any(|p| {
+                std::fs::read_to_string(p)
+                    .map(|c| c.contains(UNIX_MARKER_START))
+                    .unwrap_or(false)
+            })
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+const UNIX_MARKER_START: &str = "# >>> NodePilot initialization >>>";
+#[cfg(not(target_os = "windows"))]
+const UNIX_MARKER_END: &str = "# <<< NodePilot initialization <<<";
+
+/// Shell startup files that should source `nodepilot.env`.
+/// `~/.zshrc` is always included (default macOS shell); bash files only when they already exist.
+#[cfg(not(target_os = "windows"))]
+fn unix_shell_profiles() -> Vec<PathBuf> {
+    let home = match directories::UserDirs::new() {
+        Some(u) => u.home_dir().to_path_buf(),
+        None => match std::env::var("HOME") {
+            Ok(h) => PathBuf::from(h),
+            Err(_) => return Vec::new(),
+        },
+    };
+    let mut profiles = vec![home.join(".zshrc")];
+    for name in [".bashrc", ".bash_profile"] {
+        let p = home.join(name);
+        if p.is_file() {
+            profiles.push(p);
+        }
+    }
+    profiles
+}
+
+/// Adds (or removes) a guarded block that sources `nodepilot.env` from the user's shell startup files.
+#[cfg(not(target_os = "windows"))]
+fn configure_unix_shell_profiles(env_file: &Path, enable: bool) {
+    let block = format!(
+        "{}\n[ -f \"{}\" ] && . \"{}\"\n{}\n",
+        UNIX_MARKER_START,
+        env_file.display(),
+        env_file.display(),
+        UNIX_MARKER_END
+    );
+
+    for target in unix_shell_profiles() {
+        let existing = std::fs::read_to_string(&target).unwrap_or_default();
+        if enable {
+            if !existing.contains(UNIX_MARKER_START) {
+                let new_content = if existing.is_empty() {
+                    block.clone()
+                } else {
+                    format!("{}\n\n{}", existing.trim_end(), block)
+                };
+                let _ = std::fs::write(&target, new_content);
+            }
+        } else if let (Some(start_idx), Some(end_idx)) =
+            (existing.find(UNIX_MARKER_START), existing.find(UNIX_MARKER_END))
+        {
+            let before = &existing[..start_idx];
+            let after = &existing[end_idx + UNIX_MARKER_END.len()..];
+            let cleaned = format!("{}{}", before.trim_end(), after.trim_end());
+            let _ = std::fs::write(&target, format!("{}\n", cleaned.trim_end()));
+        }
     }
 }
 

@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 set -e
 
 # NodePilot One-Line Terminal Installer for Unix / macOS

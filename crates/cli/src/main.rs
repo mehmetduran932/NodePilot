@@ -421,6 +421,7 @@ async fn main() -> anyhow::Result<()> {
                 }
                 IntegrationCommands::Enable => {
                     enable_integration(&paths)?;
+                    deploy_tool_shims(&paths);
                     println!("{} Shell integration enabled.", CHECKMARK);
                     println!("  NodePilot bin directory added to your user PATH.");
                     println!("  Open a new terminal to start using project-aware 'node' and 'npm'.");
@@ -605,6 +606,32 @@ async fn handle_assign(paths: &NodePilotPaths, version_opt: Option<String>) -> a
     Ok(())
 }
 
+/// Copies the shim binary into `bin_dir` (if needed) and creates the node/npm/npx/ng/... routing shims.
+fn deploy_tool_shims(paths: &NodePilotPaths) {
+    let Some(shim) = nodepilot_shim::locate_shim_binary(paths) else {
+        println!("{} nodepilot-shim binary not found; tool shims (node, npm, ng, ...) were not created.", WARN);
+        return;
+    };
+
+    let shim_name = if cfg!(windows) { "nodepilot-shim.exe" } else { "nodepilot-shim" };
+    let target = paths.bin_dir.join(shim_name);
+    if shim != target {
+        if let Err(e) = std::fs::copy(&shim, &target) {
+            println!("{} Could not copy nodepilot-shim into {}: {}", WARN, paths.bin_dir.display(), e);
+            return;
+        }
+    }
+
+    match nodepilot_shim::install_shims(paths, &target) {
+        Ok(()) => println!(
+            "{} Tool shims installed: {}",
+            CHECKMARK,
+            nodepilot_shim::DEFAULT_SHIMMED_TOOLS.join(", ")
+        ),
+        Err(e) => println!("{} Failed to install tool shims: {}", WARN, e),
+    }
+}
+
 fn run_doctor(paths: &NodePilotPaths) -> anyhow::Result<()> {
     println!("\n{}", style("NodePilot Doctor - Environment Health Report").bold());
     println!("--------------------------------------------------");
@@ -668,6 +695,7 @@ async fn run_setup_wizard(paths: &NodePilotPaths) -> anyhow::Result<()> {
 
     if enable_shell {
         enable_integration(paths)?;
+        deploy_tool_shims(paths);
         settings.shell_integration_enabled = true;
         println!("{} Shell integration enabled in user PATH.", CHECKMARK);
     } else {

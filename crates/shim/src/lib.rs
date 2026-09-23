@@ -1,6 +1,6 @@
 //! NodePilot routing shim management and installation.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use nodepilot_core::{NodePilotError, NodePilotPaths};
 
 /// List of standard and common developer tools to shim by default
@@ -33,6 +33,19 @@ pub fn install_shims(paths: &NodePilotPaths, shim_binary_path: &Path) -> Result<
     }
 
     Ok(())
+}
+
+/// Locates the `nodepilot-shim` binary: first in `paths.bin_dir`, then next to the running executable.
+pub fn locate_shim_binary(paths: &NodePilotPaths) -> Option<PathBuf> {
+    let name = if cfg!(windows) { "nodepilot-shim.exe" } else { "nodepilot-shim" };
+    let in_bin = paths.bin_dir.join(name);
+    if in_bin.is_file() {
+        return Some(in_bin);
+    }
+    std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(|dir| dir.join(name)))
+        .filter(|p| p.is_file())
 }
 
 /// Installs or updates a single tool shim on Windows
