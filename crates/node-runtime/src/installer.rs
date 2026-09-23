@@ -25,11 +25,7 @@ pub fn install_node_archive(
     let temp_staging_dir = paths.versions_dir.join(format!(".tmp_{}_{}", clean_version, std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis()));
     std::fs::create_dir_all(&temp_staging_dir)?;
 
-    let extract_res = if archive_path.to_string_lossy().ends_with(".zip") {
-        extract_zip(archive_path, &temp_staging_dir)
-    } else {
-        extract_tar_gz(archive_path, &temp_staging_dir)
-    };
+    let extract_res = extract_archive(archive_path, &temp_staging_dir);
 
     if let Err(e) = extract_res {
         let _ = std::fs::remove_dir_all(&temp_staging_dir);
@@ -112,6 +108,15 @@ pub fn uninstall_node_version(paths: &NodePilotPaths, version: &str) -> Result<(
         std::fs::remove_dir_all(&target)?;
     }
     Ok(())
+}
+
+/// Extracts a `.zip` or `.tar.gz` archive into `target_dir`, rejecting path traversal entries.
+pub fn extract_archive(archive_path: &Path, target_dir: &Path) -> Result<(), NodePilotError> {
+    if archive_path.to_string_lossy().ends_with(".zip") {
+        extract_zip(archive_path, target_dir)
+    } else {
+        extract_tar_gz(archive_path, target_dir)
+    }
 }
 
 fn extract_zip(archive_path: &Path, target_dir: &Path) -> Result<(), NodePilotError> {

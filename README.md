@@ -32,6 +32,25 @@ curl -fsSL https://raw.githubusercontent.com/mehmetduran932/NodePilot/master/scr
 cargo install nodepilot --git https://github.com/mehmetduran932/NodePilot.git
 ```
 
+The installers place `nodepilot`, `nodepilot-shim` and the tool shims (`node`, `npm`, `npx`, `corepack`, `ng`, `yarn`, `pnpm`, `tsc`, `vite`, `next`, `nest`, `turbo`, `vue`) in `~/.nodepilot/bin` (macOS) or `%LOCALAPPDATA%\NodePilot\bin` (Windows) and enable shell integration. Open a new terminal afterwards.
+
+> Cargo installs only the binaries. Run `nodepilot integration enable` once to create the shims and add them to your PATH.
+
+---
+
+## 🔄 Updating
+
+```bash
+nodepilot update           # download the latest release, replace the binaries and refresh the shims
+nodepilot update --check   # only check whether a newer version exists
+nodepilot update --force   # reinstall the latest release (repairs missing or broken shims)
+```
+
+* Your installed Node runtimes, project assignments and settings are kept.
+* **Updating from v0.1.0 or v0.1.1:** these versions cannot update themselves (their `update` command suggests `brew`/`winget`, which do not exist). Re-run the one-line installer from [Quick Install](#-quick-install) once; from then on use `nodepilot update`.
+* Cargo installs are not self-updated. Use `cargo install nodepilot --git https://github.com/mehmetduran932/NodePilot.git --force`.
+* Windows: the old binaries are kept as `*.exe.old` until the next update, because a running `.exe` cannot be deleted.
+
 ---
 
 ## 🌟 Why NodePilot?
@@ -136,9 +155,51 @@ nodepilot gui install    # Enable and configure visual desktop/browser interface
 nodepilot gui open       # Launch visual GUI dashboard
 nodepilot gui remove     # Disable GUI component and return to pure terminal mode
 
-# Check for application updates
+# Update NodePilot (see "Updating")
 nodepilot update
+nodepilot update --check
 ```
+
+---
+
+## ⚠️ Good to Know
+
+### How a command is routed
+When you run `node`, `npm`, `ng` and the other shimmed tools, NodePilot does the following:
+
+1. It resolves the project's version spec from the nearest config file (see the hierarchy above).
+2. It picks the **highest installed runtime** that satisfies that spec. Supported specs:
+   * exact or partial versions: `20.19.5`, `20`, `v20.19`
+   * aliases: `lts/*`, `lts/iron`, `node`, `latest`
+   * npm-style ranges: `>=18.19`, `>=18 <21`, `^20 || ^22`, `18.x`
+3. If no installed runtime matches, it installs one automatically (`autoInstallMissingNode`). A loose `engines.node` range is handled differently: if another Node (nvm or system) is on your PATH, that Node is used instead of starting a download.
+4. It looks for the tool in this order: the project's `node_modules/.bin`, then the runtime's global packages, then any other copy on your PATH (for example an nvm global `ng`). Whichever copy it finds runs with the project's runtime first on PATH.
+
+### Coexisting with nvm / fnm / Volta
+* In a directory with **no version spec** and no global default (`nodepilot` settings), commands are passed through unchanged to the next `node` on your PATH, so nvm-managed setups keep working.
+* NodePilot never edits nvm/fnm/Volta files. Setting a global default version makes NodePilot handle *every* directory.
+* When one tool calls another, for example `ng serve` running `pnpm --version`, the nested call never triggers downloads or global installs. Missing tools simply report "not found".
+
+### Windows PATH order
+Windows puts the **System** PATH before the **User** PATH. NodePilot adds its bin directory to the User PATH, and additionally to your PowerShell profiles so that it comes first there.
+
+If nvm-windows or the Node.js installer placed `C:\Program Files\nodejs` on the System PATH, **cmd.exe and some IDE terminals may still run that Node** instead of NodePilot. To check, run `where node` in cmd. The first entry should be `...\NodePilot\bin\node.exe`. If it is not, either use PowerShell or move the NodePilot bin directory above the nodejs entry in *System Properties → Environment Variables*.
+
+### macOS shell integration
+`nodepilot integration enable` writes `~/.nodepilot/nodepilot.env` and adds a guarded block to `~/.zshrc`, and to `~/.bashrc` / `~/.bash_profile` if they exist:
+
+```sh
+# >>> NodePilot initialization >>>
+[ -f "$HOME/.nodepilot/nodepilot.env" ] && . "$HOME/.nodepilot/nodepilot.env"
+# <<< NodePilot initialization <<<
+```
+
+`nodepilot integration disable` removes the block and the env file. Other shells (fish, nushell) need `~/.nodepilot/bin` added to PATH manually.
+
+### Troubleshooting
+* `nodepilot current` shows which spec applies in this directory and which installed runtime satisfies it.
+* `nodepilot doctor` lists the other version managers it detects and the state of the shell integration.
+* If shims are missing after an upgrade, run `nodepilot integration enable` or `nodepilot update --force`.
 
 ---
 

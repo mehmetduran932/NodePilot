@@ -18,7 +18,7 @@ use nodepilot_node_runtime::{
 };
 use nodepilot_scanner::scan_workspace;
 use nodepilot_compatibility::calculate_auto_assign_diff;
-use nodepilot_updater::check_for_updates;
+use nodepilot_updater::{apply_update, check_for_updates, cleanup_previous_update};
 
 static CHECKMARK: Emoji<'_, '_> = Emoji("✔ ", "[v] ");
 static CROSS: Emoji<'_, '_> = Emoji("✖ ", "[x] ");
@@ -88,8 +88,15 @@ enum Commands {
         action: Option<IntegrationCommands>,
     },
 
-    /// Check for NodePilot application updates
-    Update,
+    /// Update NodePilot to the latest release (binaries + tool shims)
+    Update {
+        /// Only check whether a newer version exists
+        #[arg(long)]
+        check: bool,
+        /// Reinstall the latest release even if already up to date (repair)
+        #[arg(long)]
+        force: bool,
+    },
 
     /// Open or display application logs directory
     Logs,
@@ -433,15 +440,8 @@ async fn main() -> anyhow::Result<()> {
             }
         }
 
-        Commands::Update => {
-            println!("Checking for NodePilot updates...");
-            let update = check_for_updates().await?;
-            if update.update_available {
-                println!("\n{} NodePilot {} is available! (Current: {})", CHECKMARK, update.latest_version, update.current_version);
-                println!("To update run:\n  {}", style(&update.package_manager_command).cyan());
-            } else {
-                println!("{} You are on the latest version of NodePilot (v{}).", CHECKMARK, update.current_version);
-            }
+        Commands::Update { check, force } => {
+            handle_update(&paths, check, force).await?;
         }
 
         Commands::Logs => {
@@ -602,6 +602,42 @@ async fn handle_assign(paths: &NodePilotPaths, version_opt: Option<String>) -> a
     println!("  Updated .gitignore safely");
     println!("  Working directory: {}\n", cwd.display());
 
+    Ok(())
+}
+
+async fn handle_update(paths: &NodePilotPaths, check_only: bool, force: bool) -> anyhow::Result<()> {
+    cleanup_previous_update(paths);
+
+    println!("Checking for NodePilot updates...");
+    let update = check_for_updates().await?;
+    if !update.update_available && !force {
+        println!("{} You are on the latest version of NodePilot (v{}).", CHECKMARK, update.current_version);
+        return Ok(());
+    }
+
+    if update.update_available {
+        println!("\n{} NodePilot {} is available! (Current: {})", CHECKMARK, update.latest_version, update.current_version);
+    }
+    if check_only {
+        println!("To update run:\n  {}", style("nodepilot update").cyan());
+        return Ok(());
+    }
+
+    // Only self-manage installs living in NodePilot's bin directory (not e.g. `cargo install` builds)
+    let exe_dir = std::env::current_exe()?
+        .parent()
+        .map(|p| std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf()));
+    let bin_dir = std::fs::canonicalize(&paths.bin_dir).unwrap_or_else(|_| paths.bin_dir.clone());
+    if exe_dir.as_deref() != Some(bin_dir.as_path()) {
+        println!("{} This nodepilot is not running from {}; update it with the tool you installed it with,", WARN, paths.bin_dir.display());
+        println!("  e.g. {}", style("cargo install nodepilot --git https://github.com/mehmetduran932/NodePilot.git --force").cyan());
+        return Ok(());
+    }
+
+    println!("{} Downloading NodePilot v{}...", PACKAGE, update.latest_version);
+    apply_update(paths, &update).await?;
+    deploy_tool_shims(paths);
+    println!("{} NodePilot updated to v{}.", CHECKMARK, update.latest_version);
     Ok(())
 }
 
