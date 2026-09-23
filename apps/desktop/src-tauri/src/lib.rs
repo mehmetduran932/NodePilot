@@ -239,6 +239,7 @@ fn toggle_shell_integration(enable: bool) -> Result<IntegrationStatus, String> {
     let paths = NodePilotPaths::default().map_err(|e| e.to_string())?;
     if enable {
         enable_integration(&paths).map_err(|e| e.to_string())?;
+        nodepilot_shim::deploy_tool_shims(&paths).map_err(|e| e.to_string())?;
     } else {
         disable_integration(&paths).map_err(|e| e.to_string())?;
     }
@@ -256,9 +257,8 @@ fn open_project_terminal(project_path: String) -> Result<(), String> {
 
     let mut env_path = std::env::var("PATH").unwrap_or_default();
     if let Some(res) = resolved {
-        let clean = res.raw_version.trim_start_matches('v');
-        if is_version_installed(&paths, clean) {
-            let bin_dir = paths.version_bin_dir(clean);
+        if let Some(installed) = nodepilot_core::find_installed_match(&paths, &res.raw_version) {
+            let bin_dir = paths.version_bin_dir(&installed);
             let sep = if cfg!(windows) { ";" } else { ":" };
             env_path = format!("{}{}{}", bin_dir.to_string_lossy(), sep, env_path);
         }

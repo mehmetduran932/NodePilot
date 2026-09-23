@@ -12,11 +12,11 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["NodePilot Contributors"]
 license = "MIT"
-repository = "https://github.com/nodepilot/nodepilot"
+repository = "https://github.com/mehmetduran932/NodePilot"
 keywords = ["node", "version-manager", "developer-tools", "runtime"]
 
 [workspace.dependencies]

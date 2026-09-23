@@ -71,6 +71,7 @@ fn test_scanner_prunes_node_modules_and_dist() {
     fs::write(dist_dir.join("package.json"), r#"{"name": "build-lib"}"#).unwrap();
 
     let projects = scan_workspace(root, None, 5).unwrap();
+    // Only parent-app should be discovered; node_modules and dist must be pruned!
     assert_eq!(projects.len(), 1);
     assert_eq!(projects[0].name, "parent-app");
 }

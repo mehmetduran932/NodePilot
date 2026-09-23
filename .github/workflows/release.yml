@@ -11,8 +11,9 @@ permissions:
 
 jobs:
   release-cli:
-    name: Build & Package on ${{ matrix.platform }}
+    name: Build & Package ${{ matrix.target }}
     runs-on: ${{ matrix.platform }}
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -23,7 +24,8 @@ jobs:
           - platform: 'macos-latest'
             target: 'aarch64-apple-darwin'
             archive_name: 'nodepilot-macos-arm64.tar.gz'
-          - platform: 'macos-13'
+          # Intel binary is cross-compiled on Apple Silicon; the macos-13 runner image was retired
+          - platform: 'macos-latest'
             target: 'x86_64-apple-darwin'
             archive_name: 'nodepilot-macos-x64.tar.gz'
 

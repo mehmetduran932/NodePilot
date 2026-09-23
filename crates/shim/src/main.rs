@@ -3,20 +3,33 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use nodepilot_core::{
-    resolve_project_node, NodePilotPaths, Settings, SHIM_RECURSION_ENV_VAR,
+    find_installed_match, is_range_spec, resolve_project_node, NodePilotPaths, Settings,
+    SHIM_RECURSION_ENV_VAR,
 };
+
+/// Nested shim invocations beyond this depth are treated as a routing loop.
+const MAX_SHIM_DEPTH: u32 = 8;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    let current_exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("node"));
-    let exe_stem = current_exe
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("node")
-        .to_lowercase();
+
+    // Prefer argv[0]: on Linux (and sometimes macOS) current_exe() resolves the
+    // `node -> nodepilot-shim` symlink, which would lose the invoked tool name.
+    let exe_stem = args
+        .first()
+        .map(PathBuf::from)
+        .and_then(|p| p.file_stem().and_then(|s| s.to_str()).map(|s| s.to_lowercase()))
+        .filter(|s| !s.is_empty())
+        .or_else(|| {
+            std::env::current_exe()
+                .ok()
+                .and_then(|p| p.file_stem().and_then(|s| s.to_str()).map(|s| s.to_lowercase()))
+        })
+        .unwrap_or_else(|| "node".to_string());
+    let invoked_directly = exe_stem == "nodepilot-shim";
 
     // Determine target command name
-    let tool_name = if exe_stem == "nodepilot-shim" {
+    let tool_name = if invoked_directly {
         // If invoked directly as nodepilot-shim, check first arg or default to node
         if args.len() > 1 && !args[1].starts_with('-') {
             args[1].clone()
@@ -28,24 +41,24 @@ fn main() {
     };
 
     // Forwarding arguments (slice past tool name if invoked as nodepilot-shim <tool>)
-    let forward_args: Vec<String> = if current_exe
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("")
-        .eq_ignore_ascii_case("nodepilot-shim")
-        && args.len() > 1
-        && args[1] == tool_name
-    {
+    let forward_args: Vec<String> = if invoked_directly && args.len() > 1 && args[1] == tool_name {
         args[2..].to_vec()
     } else {
-        args[1..].to_vec()
+        args.get(1..).map(|a| a.to_vec()).unwrap_or_default()
     };
 
-    // Recursion loop defense
-    if std::env::var(SHIM_RECURSION_ENV_VAR).is_ok() {
+    // Recursion loop defense. Tools legitimately spawn other shimmed tools
+    // (e.g. `ng serve` probes `yarn --version` / `pnpm --version`), so only a deep chain is a loop.
+    let depth: u32 = std::env::var(SHIM_RECURSION_ENV_VAR)
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
+    if depth >= MAX_SHIM_DEPTH {
         eprintln!("NodePilot: Recursive shim invocation detected. Please ensure Node runtime is installed properly.");
         std::process::exit(1);
     }
+    let nested = depth > 0;
+    let next_depth = (depth + 1).to_string();
 
     let paths = match NodePilotPaths::default() {
         Ok(p) => p,
@@ -57,16 +70,21 @@ fn main() {
 
     let settings = Settings::load(&paths.settings_file()).unwrap_or_default();
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let original_path = std::env::var("PATH").unwrap_or_default();
 
     // Resolve required Node version
     let resolved = resolve_project_node(&cwd, settings.global_default_version.as_deref());
 
-    let (version, _is_fallback) = match resolved {
-        Some(res) => (res.raw_version, false),
+    let version = match resolved {
+        Some(res) => res.raw_version,
         None => {
-            // Find any latest installed version as fallback
+            // Nothing assigned: stay out of the way and let nvm / system Node handle it.
+            if let Some(external) = find_on_path_outside(&tool_name, &original_path, &paths.bin_dir) {
+                exec_passthrough(&external, &forward_args, &next_depth);
+            }
+            // No other Node on PATH: fall back to the newest NodePilot-installed version
             if let Some(latest_installed) = find_any_installed_version(&paths) {
-                (latest_installed, true)
+                latest_installed
             } else {
                 eprintln!("NodePilot: No Node.js version assigned to this directory, and no versions are installed.");
                 eprintln!("Run 'nodepilot install 22' or 'nodepilot assign 22' to configure.");
@@ -75,12 +93,23 @@ fn main() {
         }
     };
 
-    let clean_version = version.trim_start_matches('v');
+    // Map the project spec ("20", "lts/*", ">=18.19") to an installed runtime
+    let installed_version = match find_installed_match(&paths, &version) {
+        Some(v) => v,
+        None => {
+            // A loose `engines` range is a constraint, not a pin: if nvm/system Node is available, let it run
+            if is_range_spec(&version) {
+                if let Some(external) = find_on_path_outside(&tool_name, &original_path, &paths.bin_dir) {
+                    exec_passthrough(&external, &forward_args, &next_depth);
+                }
+            }
 
-    // Ensure Node.js runtime is installed
-    let node_bin = paths.node_binary_path(clean_version);
-    if !node_bin.is_file() {
-        if settings.auto_install_missing_node {
+            if !settings.auto_install_missing_node {
+                eprintln!("NodePilot: Project requires Node {}, but it is not installed.", version);
+                eprintln!("Run: nodepilot install {}", version);
+                std::process::exit(1);
+            }
+
             eprintln!("NodePilot: Project requires Node {}, which is not yet installed.", version);
             eprintln!("NodePilot: Automatically installing Node {} environment...", version);
 
@@ -96,35 +125,40 @@ fn main() {
                 .arg(&version)
                 .status();
 
-            if !(install_status.is_ok() && node_bin.is_file()) {
-                eprintln!("NodePilot: Automatic installation failed. Please run: nodepilot install {}", version);
-                std::process::exit(1);
+            match find_installed_match(&paths, &version) {
+                Some(v) if install_status.is_ok() => v,
+                _ => {
+                    eprintln!("NodePilot: Automatic installation failed. Please run: nodepilot install {}", version);
+                    std::process::exit(1);
+                }
             }
-        } else {
-            eprintln!("NodePilot: Project requires Node {}, but it is not installed.", version);
-            eprintln!("Run: nodepilot install {}", version);
-            std::process::exit(1);
         }
-    }
+    };
+    let clean_version = installed_version.as_str();
 
     // Resolve target executable
     let is_standard_tool = ["node", "npm", "npx", "corepack"].contains(&tool_name.as_str());
     let target_bin = if is_standard_tool {
         get_standard_tool_path(&paths, clean_version, &tool_name)
     } else {
-        match resolve_external_tool(&paths, clean_version, &tool_name, &cwd, &settings) {
+        match resolve_external_tool(&paths, clean_version, &tool_name, &cwd, &settings, nested) {
             Some(p) => p,
-            None => {
-                eprintln!("NodePilot: Command '{}' is not recognized or not installed in Node {} environment.", tool_name, clean_version);
-                eprintln!("Tip: Install it locally in your project or run 'npm install -g {}' to make it available.", tool_name);
-                std::process::exit(1);
-            }
+            // Installed elsewhere on PATH (e.g. an nvm global): run it with this project's Node first on PATH.
+            None => match find_on_path_outside(&tool_name, &original_path, &paths.bin_dir) {
+                Some(external) => external,
+                // A probe from another tool (e.g. `pnpm --version` during `ng serve`) just sees a missing command.
+                None if nested => std::process::exit(127),
+                None => {
+                    eprintln!("NodePilot: Command '{}' is not recognized or not installed in Node {} environment.", tool_name, clean_version);
+                    eprintln!("Tip: Install it locally in your project or run 'npm install -g {}' to make it available.", tool_name);
+                    std::process::exit(1);
+                }
+            },
         }
     };
 
     // Prepare updated PATH with project local node_modules/.bin AND active runtime bin prepended
     let runtime_bin_dir = paths.version_bin_dir(clean_version);
-    let original_path = std::env::var("PATH").unwrap_or_default();
     let path_sep = if cfg!(windows) { ";" } else { ":" };
 
     let mut path_additions = Vec::new();
@@ -160,7 +194,7 @@ fn main() {
         };
 
         let status = cmd
-            .env(SHIM_RECURSION_ENV_VAR, "1")
+            .env(SHIM_RECURSION_ENV_VAR, &next_depth)
             .env("PATH", new_path)
             .status();
 
@@ -178,7 +212,7 @@ fn main() {
         use std::os::unix::process::CommandExt;
         let err = Command::new(&target_bin)
             .args(&forward_args)
-            .env(SHIM_RECURSION_ENV_VAR, "1")
+            .env(SHIM_RECURSION_ENV_VAR, &next_depth)
             .env("PATH", new_path)
             .exec();
 
@@ -203,6 +237,7 @@ fn resolve_external_tool(
     tool: &str,
     cwd: &Path,
     settings: &Settings,
+    nested: bool,
 ) -> Option<PathBuf> {
     // 1. Check local project node_modules/.bin (highest priority for project-specific tooling)
     if let Some(local_bin) = find_local_node_modules_bin(cwd, tool) {
@@ -243,7 +278,7 @@ fn resolve_external_tool(
     }
 
     // 4. Auto-install fallback via active npm
-    if settings.auto_install_missing_node {
+    if settings.auto_install_missing_node && !nested {
         if let Some(pkg) = map_tool_to_npm_package(tool) {
             eprintln!("NodePilot: Tool '{}' ({}) not found in Node {}. Auto-installing globally...", tool, pkg, version);
             let npm_cmd = paths.npm_binary_path(version);
@@ -475,6 +510,114 @@ fn find_any_installed_version(paths: &NodePilotPaths) -> Option<String> {
             }
         }
     }
-    versions.sort_by(|a, b| b.cmp(a));
+    versions.sort_by_key(|v| std::cmp::Reverse(version_key(v)));
     versions.into_iter().next()
+}
+
+/// Numeric sort key so that 22.10.0 > 22.9.0 > 9.0.0
+fn version_key(v: &str) -> Vec<u64> {
+    v.trim_start_matches('v')
+        .split('.')
+        .map(|part| {
+            part.chars()
+                .take_while(|c| c.is_ascii_digit())
+                .collect::<String>()
+                .parse()
+                .unwrap_or(0)
+        })
+        .collect()
+}
+
+/// Finds `tool` on PATH while skipping NodePilot's own shim directory (e.g. nvm or system Node).
+fn find_on_path_outside(tool: &str, path_var: &str, shim_dir: &Path) -> Option<PathBuf> {
+    let shim_dir_canon = std::fs::canonicalize(shim_dir).unwrap_or_else(|_| shim_dir.to_path_buf());
+    let names: Vec<String> = if cfg!(windows) {
+        vec![format!("{}.exe", tool), format!("{}.cmd", tool), format!("{}.bat", tool)]
+    } else {
+        vec![tool.to_string()]
+    };
+
+    for dir in std::env::split_paths(path_var) {
+        if dir.as_os_str().is_empty() {
+            continue;
+        }
+        let dir_canon = std::fs::canonicalize(&dir).unwrap_or_else(|_| dir.clone());
+        let is_shim_dir = if cfg!(windows) {
+            dir_canon.to_string_lossy().eq_ignore_ascii_case(&shim_dir_canon.to_string_lossy())
+        } else {
+            dir_canon == shim_dir_canon
+        };
+        if is_shim_dir {
+            continue;
+        }
+        for name in &names {
+            let candidate = dir.join(name);
+            if is_executable_file(&candidate) {
+                return Some(candidate);
+            }
+        }
+    }
+    None
+}
+
+#[cfg(not(target_os = "windows"))]
+fn is_executable_file(p: &Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::metadata(p)
+        .map(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
+        .unwrap_or(false)
+}
+
+#[cfg(target_os = "windows")]
+fn is_executable_file(p: &Path) -> bool {
+    p.is_file()
+}
+
+/// Runs a non-NodePilot binary unchanged (PATH untouched) and exits with its status.
+fn exec_passthrough(target: &Path, args: &[String], next_depth: &str) -> ! {
+    #[cfg(target_os = "windows")]
+    {
+        let is_cmd_or_bat = target
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|ext| ext.eq_ignore_ascii_case("cmd") || ext.eq_ignore_ascii_case("bat"))
+            .unwrap_or(false);
+        let mut cmd = if is_cmd_or_bat {
+            let mut c = Command::new("cmd.exe");
+            c.arg("/c").arg(target);
+            c
+        } else {
+            Command::new(target)
+        };
+        match cmd.args(args).env(SHIM_RECURSION_ENV_VAR, next_depth).status() {
+            Ok(s) => std::process::exit(s.code().unwrap_or(0)),
+            Err(e) => {
+                eprintln!("NodePilot: Failed to execute {}: {}", target.display(), e);
+                std::process::exit(1);
+            }
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        use std::os::unix::process::CommandExt;
+        let err = Command::new(target)
+            .args(args)
+            .env(SHIM_RECURSION_ENV_VAR, next_depth)
+            .exec();
+        eprintln!("NodePilot: Failed to exec {}: {}", target.display(), err);
+        std::process::exit(1);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::version_key;
+
+    #[test]
+    fn version_key_orders_numerically() {
+        let mut versions = vec!["9.0.0", "22.9.0", "22.10.0", "v18.20.8"];
+        versions.sort_by_key(|v| std::cmp::Reverse(version_key(v)));
+        assert_eq!(versions, vec!["22.10.0", "22.9.0", "v18.20.8", "9.0.0"]);
+    }
 }

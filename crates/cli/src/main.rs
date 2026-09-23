@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use nodepilot_core::{
     ensure_gitignore_entry, inspect_environment, resolve_project_node,
     AppState, NodePilotPaths, Settings,
-    get_integration_status, enable_integration, disable_integration,
+    get_integration_status, enable_integration, disable_integration, find_installed_match,
     LOCAL_METADATA_FILENAME,
 };
 use nodepilot_node_runtime::{
@@ -218,11 +218,10 @@ async fn main() -> anyhow::Result<()> {
 
             match resolved {
                 Some(res) => {
-                    let clean = res.raw_version.trim_start_matches('v');
-                    let installed_status = if is_version_installed(&paths, clean) {
-                        style("installed").green()
+                    let installed_status = if let Some(v) = find_installed_match(&paths, &res.raw_version) {
+                        style(format!("installed as v{}", v)).green()
                     } else {
-                        style("not installed - run 'nodepilot install <version>'").red()
+                        style("not installed - run 'nodepilot install <version>'".to_string()).red()
                     };
 
                     println!("\n{}", style("Current Node Configuration").bold());
@@ -421,6 +420,7 @@ async fn main() -> anyhow::Result<()> {
                 }
                 IntegrationCommands::Enable => {
                     enable_integration(&paths)?;
+                    deploy_tool_shims(&paths);
                     println!("{} Shell integration enabled.", CHECKMARK);
                     println!("  NodePilot bin directory added to your user PATH.");
                     println!("  Open a new terminal to start using project-aware 'node' and 'npm'.");
@@ -605,6 +605,19 @@ async fn handle_assign(paths: &NodePilotPaths, version_opt: Option<String>) -> a
     Ok(())
 }
 
+/// Creates the node/npm/npx/ng/... routing shims in `bin_dir`.
+fn deploy_tool_shims(paths: &NodePilotPaths) {
+    match nodepilot_shim::deploy_tool_shims(paths) {
+        Ok(true) => println!(
+            "{} Tool shims installed: {}",
+            CHECKMARK,
+            nodepilot_shim::DEFAULT_SHIMMED_TOOLS.join(", ")
+        ),
+        Ok(false) => println!("{} nodepilot-shim binary not found; tool shims (node, npm, ng, ...) were not created.", WARN),
+        Err(e) => println!("{} Failed to install tool shims: {}", WARN, e),
+    }
+}
+
 fn run_doctor(paths: &NodePilotPaths) -> anyhow::Result<()> {
     println!("\n{}", style("NodePilot Doctor - Environment Health Report").bold());
     println!("--------------------------------------------------");
@@ -668,6 +681,7 @@ async fn run_setup_wizard(paths: &NodePilotPaths) -> anyhow::Result<()> {
 
     if enable_shell {
         enable_integration(paths)?;
+        deploy_tool_shims(paths);
         settings.shell_integration_enabled = true;
         println!("{} Shell integration enabled in user PATH.", CHECKMARK);
     } else {

@@ -9,6 +9,7 @@ pub mod resolution;
 pub mod gitignore;
 pub mod managers;
 pub mod integration;
+pub mod version_match;
 
 pub use constants::*;
 pub use paths::{NodePilotPaths, normalize_path};
@@ -19,3 +20,4 @@ pub use resolution::{resolve_project_node, resolve_directory_node, ResolutionRes
 pub use gitignore::ensure_gitignore_entry;
 pub use managers::{inspect_environment, EnvironmentReport, DetectedManager};
 pub use integration::{get_integration_status, enable_integration, disable_integration, IntegrationStatus};
+pub use version_match::{find_installed_match, is_range_spec, version_satisfies};

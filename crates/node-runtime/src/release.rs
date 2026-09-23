@@ -103,7 +103,7 @@ pub fn resolve_version_alias(query: &str, releases: &[NodeRelease]) -> Result<St
             .ok_or_else(|| NodePilotError::VersionParse("No releases found in release index".into()));
     }
 
-    if q == "lts" {
+    if q == "lts" || q == "lts/*" {
         return releases
             .iter()
             .find(|r| r.is_lts())
@@ -137,6 +137,14 @@ pub fn resolve_version_alias(query: &str, releases: &[NodeRelease]) -> Result<St
         if clean.starts_with(q_trimmed) {
             return Ok(clean);
         }
+    }
+
+    // Ranges and aliases such as ">=18 <23", "^20 || ^22", "lts/iron", "node" (releases are newest first)
+    if let Some(r) = releases
+        .iter()
+        .find(|r| nodepilot_core::version_satisfies(&q, &r.clean_version()))
+    {
+        return Ok(r.clean_version());
     }
 
     // If not found in index, but user passed valid semver, allow as fallback

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use nodepilot_core::NodePilotError;
 
 pub const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
-pub const GITHUB_RELEASES_API: &str = "https://api.github.com/repos/nodepilot/nodepilot/releases/latest";
+pub const GITHUB_RELEASES_API: &str = "https://api.github.com/repos/mehmetduran932/NodePilot/releases/latest";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
