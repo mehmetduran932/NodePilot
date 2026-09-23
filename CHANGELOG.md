@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2026-09-24
+
+### Added
+- `nodepilot update` now updates NodePilot itself: it downloads this platform's release archive, replaces `nodepilot` / `nodepilot-shim` in place (atomic rename on macOS, rename-aside on Windows), and refreshes the tool shims. Use `--check` to only check and `--force` to reinstall/repair.
+- README: "Updating" and "Good to Know" sections (routing rules, supported version specs, nvm coexistence, Windows System-vs-User PATH order, macOS shell integration, troubleshooting).
+
+### Fixed
+- The update command no longer suggests non-existent `brew` / `winget` packages.
+
 ## [0.1.1] - 2026-09-24
 
 ### Fixed

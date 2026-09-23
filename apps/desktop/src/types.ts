@@ -115,5 +115,6 @@ export interface UpdateCheckResult {
   latestVersion: string;
   releaseNotes?: string;
   downloadUrl?: string;
+  assetUrl?: string;
   packageManagerCommand: string;
 }

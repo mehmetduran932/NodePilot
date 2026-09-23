@@ -70,6 +70,7 @@ try {
     Write-Host "[v] NodePilot successfully installed to: $installBinDir" -ForegroundColor Green
     Write-Host "You can now run 'nodepilot' from any terminal window." -ForegroundColor Yellow
     Write-Host "Try: nodepilot --help or nodepilot current" -ForegroundColor Gray
+    Write-Host "Update later with: nodepilot update" -ForegroundColor Gray
 }
 finally {
     if (Test-Path $tempDir) {
