@@ -25,4 +25,5 @@ nodepilot-node-runtime = { workspace = true }
 nodepilot-scanner = { workspace = true }
 nodepilot-compatibility = { workspace = true }
 nodepilot-updater = { workspace = true }
+nodepilot-shim = { workspace = true }
 chrono = { workspace = true }

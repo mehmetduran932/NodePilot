@@ -3,7 +3,8 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use nodepilot_core::{
-    resolve_project_node, NodePilotPaths, Settings, SHIM_RECURSION_ENV_VAR,
+    find_installed_match, is_range_spec, resolve_project_node, NodePilotPaths, Settings,
+    SHIM_RECURSION_ENV_VAR,
 };
 
 /// Nested shim invocations beyond this depth are treated as a routing loop.
@@ -92,12 +93,23 @@ fn main() {
         }
     };
 
-    let clean_version = version.trim_start_matches('v');
+    // Map the project spec ("20", "lts/*", ">=18.19") to an installed runtime
+    let installed_version = match find_installed_match(&paths, &version) {
+        Some(v) => v,
+        None => {
+            // A loose `engines` range is a constraint, not a pin: if nvm/system Node is available, let it run
+            if is_range_spec(&version) {
+                if let Some(external) = find_on_path_outside(&tool_name, &original_path, &paths.bin_dir) {
+                    exec_passthrough(&external, &forward_args, &next_depth);
+                }
+            }
 
-    // Ensure Node.js runtime is installed
-    let node_bin = paths.node_binary_path(clean_version);
-    if !node_bin.is_file() {
-        if settings.auto_install_missing_node {
+            if !settings.auto_install_missing_node {
+                eprintln!("NodePilot: Project requires Node {}, but it is not installed.", version);
+                eprintln!("Run: nodepilot install {}", version);
+                std::process::exit(1);
+            }
+
             eprintln!("NodePilot: Project requires Node {}, which is not yet installed.", version);
             eprintln!("NodePilot: Automatically installing Node {} environment...", version);
 
@@ -113,16 +125,16 @@ fn main() {
                 .arg(&version)
                 .status();
 
-            if !(install_status.is_ok() && node_bin.is_file()) {
-                eprintln!("NodePilot: Automatic installation failed. Please run: nodepilot install {}", version);
-                std::process::exit(1);
+            match find_installed_match(&paths, &version) {
+                Some(v) if install_status.is_ok() => v,
+                _ => {
+                    eprintln!("NodePilot: Automatic installation failed. Please run: nodepilot install {}", version);
+                    std::process::exit(1);
+                }
             }
-        } else {
-            eprintln!("NodePilot: Project requires Node {}, but it is not installed.", version);
-            eprintln!("Run: nodepilot install {}", version);
-            std::process::exit(1);
         }
-    }
+    };
+    let clean_version = installed_version.as_str();
 
     // Resolve target executable
     let is_standard_tool = ["node", "npm", "npx", "corepack"].contains(&tool_name.as_str());

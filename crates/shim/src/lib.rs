@@ -35,17 +35,30 @@ pub fn install_shims(paths: &NodePilotPaths, shim_binary_path: &Path) -> Result<
     Ok(())
 }
 
-/// Locates the `nodepilot-shim` binary: first in `paths.bin_dir`, then next to the running executable.
+/// Locates the `nodepilot-shim` binary shipped next to the running executable, falling back to `paths.bin_dir`.
 pub fn locate_shim_binary(paths: &NodePilotPaths) -> Option<PathBuf> {
     let name = if cfg!(windows) { "nodepilot-shim.exe" } else { "nodepilot-shim" };
-    let in_bin = paths.bin_dir.join(name);
-    if in_bin.is_file() {
-        return Some(in_bin);
-    }
     std::env::current_exe()
         .ok()
         .and_then(|exe| exe.parent().map(|dir| dir.join(name)))
         .filter(|p| p.is_file())
+        .or_else(|| Some(paths.bin_dir.join(name)).filter(|p| p.is_file()))
+}
+
+/// Copies the shim binary into `bin_dir` (if needed) and creates all routing shims.
+/// Returns `Ok(false)` when no `nodepilot-shim` binary could be found.
+pub fn deploy_tool_shims(paths: &NodePilotPaths) -> Result<bool, NodePilotError> {
+    let Some(shim) = locate_shim_binary(paths) else {
+        return Ok(false);
+    };
+    std::fs::create_dir_all(&paths.bin_dir)?;
+    let name = if cfg!(windows) { "nodepilot-shim.exe" } else { "nodepilot-shim" };
+    let target = paths.bin_dir.join(name);
+    if shim != target {
+        std::fs::copy(&shim, &target)?;
+    }
+    install_shims(paths, &target)?;
+    Ok(true)
 }
 
 /// Installs or updates a single tool shim on Windows

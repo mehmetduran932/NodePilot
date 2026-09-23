@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-09-24
+
+### Fixed
+- Tool shims (`node`, `npm`, `npx`, `ng`, `yarn`, `pnpm`, `tsc`, `vite`, ...) are now actually created by `nodepilot integration enable`, `nodepilot setup` and the desktop app, so tools like `ng build` route through NodePilot.
+- Version specs such as `20`, `v20.19`, `lts/*`, `lts/iron`, `>=18.19` and `^20 || ^22` resolve to the best installed runtime (previously only exact versions worked, causing repeated failed auto-installs).
+- nvm / system Node coexistence: directories without an assigned version, and loose `engines` ranges not satisfied locally, pass through to the next `node` on PATH instead of failing.
+- Tools installed only elsewhere on PATH (e.g. an nvm global `ng`) run with the project's Node runtime instead of erroring.
+- Nested tool probes (e.g. `pnpm --version` during `ng serve`) no longer trip the recursion guard or trigger global installs; the guard is now a depth limit.
+- Installed versions are ordered numerically (22.10.0 > 22.9.0 > 9.0.0).
+- macOS/Linux: `integration enable` now sources `~/.nodepilot/nodepilot.env` from `~/.zshrc` (and existing bash rc files); `disable` removes it.
+- Shim tool name is taken from `argv[0]`, fixing symlinked shims on Linux.
+- `install.sh` no longer starts with a UTF-8 BOM; update checks point at this repository.
+- Release workflow builds the macOS x64 binary (the retired `macos-13` runner blocked the v0.1.0 release).
+
 ## [0.1.0] - 2026-09-04
 
 ### Added

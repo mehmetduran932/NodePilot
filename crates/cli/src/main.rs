@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use nodepilot_core::{
     ensure_gitignore_entry, inspect_environment, resolve_project_node,
     AppState, NodePilotPaths, Settings,
-    get_integration_status, enable_integration, disable_integration,
+    get_integration_status, enable_integration, disable_integration, find_installed_match,
     LOCAL_METADATA_FILENAME,
 };
 use nodepilot_node_runtime::{
@@ -218,11 +218,10 @@ async fn main() -> anyhow::Result<()> {
 
             match resolved {
                 Some(res) => {
-                    let clean = res.raw_version.trim_start_matches('v');
-                    let installed_status = if is_version_installed(&paths, clean) {
-                        style("installed").green()
+                    let installed_status = if let Some(v) = find_installed_match(&paths, &res.raw_version) {
+                        style(format!("installed as v{}", v)).green()
                     } else {
-                        style("not installed - run 'nodepilot install <version>'").red()
+                        style("not installed - run 'nodepilot install <version>'".to_string()).red()
                     };
 
                     println!("\n{}", style("Current Node Configuration").bold());
@@ -606,28 +605,15 @@ async fn handle_assign(paths: &NodePilotPaths, version_opt: Option<String>) -> a
     Ok(())
 }
 
-/// Copies the shim binary into `bin_dir` (if needed) and creates the node/npm/npx/ng/... routing shims.
+/// Creates the node/npm/npx/ng/... routing shims in `bin_dir`.
 fn deploy_tool_shims(paths: &NodePilotPaths) {
-    let Some(shim) = nodepilot_shim::locate_shim_binary(paths) else {
-        println!("{} nodepilot-shim binary not found; tool shims (node, npm, ng, ...) were not created.", WARN);
-        return;
-    };
-
-    let shim_name = if cfg!(windows) { "nodepilot-shim.exe" } else { "nodepilot-shim" };
-    let target = paths.bin_dir.join(shim_name);
-    if shim != target {
-        if let Err(e) = std::fs::copy(&shim, &target) {
-            println!("{} Could not copy nodepilot-shim into {}: {}", WARN, paths.bin_dir.display(), e);
-            return;
-        }
-    }
-
-    match nodepilot_shim::install_shims(paths, &target) {
-        Ok(()) => println!(
+    match nodepilot_shim::deploy_tool_shims(paths) {
+        Ok(true) => println!(
             "{} Tool shims installed: {}",
             CHECKMARK,
             nodepilot_shim::DEFAULT_SHIMMED_TOOLS.join(", ")
         ),
+        Ok(false) => println!("{} nodepilot-shim binary not found; tool shims (node, npm, ng, ...) were not created.", WARN),
         Err(e) => println!("{} Failed to install tool shims: {}", WARN, e),
     }
 }
